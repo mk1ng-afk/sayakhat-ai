@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sayakhat Planner</title>
+<meta name="description" content="Sayakhat AI MVP: three domestic trips in Kazakhstan built around a group budget, with the full price per person.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230E7383'/%3E%3Ctext x='16' y='22' font-size='17' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'%3ES%3C/text%3E%3C/svg%3E">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Manrope:wght@400;500;600;700;800&display=swap">
+<style>
+/* Layout: app shell — trip inputs on the left, plans and assistant on the right; stacks to one column on phones */
+:root{
+  --bg:#F2F5F4; --surface:#FFFFFF; --sunk:#E8EEEC; --ink:#14211D; --muted:#566863; --line:#D6DFDC;
+  --accent:#0E7383; --accent-ink:#FFFFFF; --accent-soft:#DDEFF1; --gold:#9A6512; --gold-soft:#F6EBD8;
+  --ok:#2C7A4B; --ok-soft:#E1F1E6; --warn:#A4500C; --warn-soft:#FBEADB;
+  --display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --body:"Manrope",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1614; --surface:#15201D; --sunk:#1B2824; --ink:#E4ECE9; --muted:#97A8A3; --line:#2A3833;
+  --accent:#4DB3C3; --accent-ink:#06191C; --accent-soft:#163A40; --gold:#E2AE55; --gold-soft:#3A2D16;
+  --ok:#6CC08E; --ok-soft:#173326; --warn:#F0A060; --warn-soft:#3B2614; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1614; --surface:#15201D; --sunk:#1B2824; --ink:#E4ECE9; --muted:#97A8A3; --line:#2A3833;
+  --accent:#4DB3C3; --accent-ink:#06191C; --accent-soft:#163A40; --gold:#E2AE55; --gold-soft:#3A2D16;
+  --ok:#6CC08E; --ok-soft:#173326; --warn:#F0A060; --warn-soft:#3B2614; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{border-bottom:1px solid var(--line);background:var(--surface)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-block:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand b{font-family:var(--display);font-size:20px;letter-spacing:.01em}
+.brand span{color:var(--muted);font-size:13px}
+.top-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:var(--gold-soft);color:var(--gold)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--muted);font:600 13px var(--body);padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+main.wrap{display:grid;grid-template-columns:330px minmax(0,1fr);gap:24px;padding-block:24px 40px;align-items:start}
+@media (max-width:880px){main.wrap{grid-template-columns:minmax(0,1fr)}}
+aside.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;position:sticky;top:16px}
+@media (max-width:880px){aside.panel{position:static}}
+h1{font-family:var(--display);font-size:19px;line-height:1.25;margin:0;text-wrap:balance}
+h2{font-family:var(--display);font-size:16px;margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:0;font-size:14px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,select,textarea{font:500 15px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 11px;width:100%;min-width:0}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:6px 12px;font:600 13px var(--body);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.btn{border:0;border-radius:10px;padding:11px 16px;font:700 15px var(--body);cursor:pointer;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.btn.small{padding:7px 12px;font-size:13px}
+.note{font-size:12px;color:var(--muted);margin:0}
+.content{display:flex;flex-direction:column;gap:18px;min-width:0}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.stepper{display:inline-flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.stepper button{border:0;background:transparent;color:var(--ink);font:700 18px var(--body);width:38px;height:36px;cursor:pointer}
+.stepper output{min-width:92px;text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+.banner{background:var(--warn-soft);color:var(--ink);border-radius:10px;padding:10px 14px;font-size:14px}
+.banner b{color:var(--warn)}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:1080px){.cards{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.card .tag{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.card h3{font-family:var(--display);font-size:15px;line-height:1.3;margin:0;text-wrap:balance}
+.meta{font-size:13px;color:var(--muted)}
+.price{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.price .pp{font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+.price .ppl{font-size:13px;color:var(--muted)}
+.price .was{font-size:12px;color:var(--warn);font-weight:700;font-variant-numeric:tabular-nums}
+.tot{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.badges{display:flex;flex-wrap:wrap;gap:6px}
+.b{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--sunk);color:var(--muted)}
+.b.ok{background:var(--ok-soft);color:var(--ok)}
+.b.over{background:var(--warn-soft);color:var(--warn)}
+.list{margin:0;padding-left:18px;font-size:13px}
+.list li{margin:2px 0}
+details{border-top:1px dashed var(--line);padding-top:8px}
+summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--accent)}
+.tbl{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.small:not(.btn){font-size:12px;color:var(--muted)}
+.card .actions{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
+section.box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.chat{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;padding-right:4px}
+.msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:14px}
+.msg.u{align-self:flex-end;background:var(--accent);color:var(--accent-ink);border-bottom-right-radius:4px}
+.msg.a{align-self:flex-start;background:var(--sunk);border-bottom-left-radius:4px}
+.ask{display:flex;gap:8px}
+.ask input{flex:1}
+.sum{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+@media (max-width:720px){.sum{grid-template-columns:minmax(0,1fr)}}
+.big{font-size:28px;font-weight:800;font-variant-numeric:tabular-nums}
+textarea{min-height:120px;resize:vertical;font-size:14px}
+.rate{display:flex;gap:6px;flex-wrap:wrap}
+.rate button{width:36px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:700 14px var(--body);cursor:pointer}
+.rate button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+code.code{display:block;background:var(--sunk);border-radius:8px;padding:10px;font-size:12px;word-break:break-all;user-select:all}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:var(--r);padding:18px;color:var(--muted)}
+/* v2 after beta test: bigger group control, full-width choose, validation, booking request */
+.groupctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;padding:8px 12px}
+.groupctl .gl{font-weight:800;font-size:14px}
+.groupctl .gs{font-size:12px;color:var(--muted)}
+.stepper.big button{width:46px;height:44px;font-size:24px}
+.stepper.big output{min-width:110px;font-size:17px}
+.btn.block{width:100%;padding:12px 16px;font-size:15px}
+.b.info{background:var(--gold-soft);color:var(--gold)}
+.err{color:var(--warn);font-size:12px;font-weight:700;min-height:0}
+.err:empty{display:none}
+input[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--warn);box-shadow:0 0 0 1px var(--warn)}
+.alert{background:var(--warn-soft);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.alert .acts{display:flex;gap:8px;flex-wrap:wrap}
+.book{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.okbox{background:var(--ok-soft);border-radius:10px;padding:12px;font-size:14px}
+.okbox b{color:var(--ok)}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.chk input{width:auto;margin-top:3px}
+.whatsnew{font-size:12px;color:var(--muted)}
+.whatsnew ol{margin:6px 0 0;padding-left:18px}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .15s,box-shadow .15s}}
+</style>
+
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>Sayakhat</b><span id="t-tag"></span></div>
+    <div class="top-r">
+      <span class="pill" id="t-proto"></span>
+      <div class="seg" role="group" aria-label="Language">
+        <button type="button" id="lang-ru" aria-pressed="true">RU</button>
+        <button type="button" id="lang-en" aria-pressed="false">EN</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <aside class="panel" aria-labelledby="t-form-h">
+    <h1 id="t-form-h"></h1>
+    <p class="lead" id="t-form-lead"></p>
+    <form id="f" novalidate>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <label class="f"><span id="t-budget"></span><input id="in-budget" type="number" inputmode="numeric" min="20000" step="10000" value="300000" aria-describedby="e-budget"><span class="err" id="e-budget" role="alert"></span></label>
+        <div class="row2">
+          <label class="f"><span id="t-people"></span><input id="in-people" type="number" inputmode="numeric" min="1" max="12" value="4" aria-describedby="e-people"><span class="err" id="e-people" role="alert"></span></label>
+          <label class="f"><span id="t-days"></span><select id="in-days"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></label>
+        </div>
+        <div class="row2">
+          <label class="f"><span id="t-from"></span><select id="in-from"><option value="almaty">Алматы</option><option value="astana">Астана</option></select></label>
+          <label class="f"><span id="t-date"></span><input id="in-date" type="date" aria-describedby="e-date"><span class="err" id="e-date" role="alert"></span></label>
+        </div>
+        <div class="f" style="display:flex;flex-direction:column;gap:6px"><span class="f" id="t-int" style="font-size:13px"></span>
+          <div class="chips" id="interests"></div>
+        </div>
+        <div class="chips" id="flags"></div>
+        <button class="btn" type="submit" id="t-go"></button>
+        <p class="note" id="t-note"></p>
+      </div>
+    </form>
+    <details class="whatsnew"><summary id="t-new-h"></summary><ol id="t-new"></ol></details>
+  </aside>
+
+  <div class="content">
+    <section id="summary" class="box" hidden aria-live="polite"></section>
+
+    <div class="bar">
+      <h2 id="t-res"></h2>
+      <div class="groupctl">
+        <div style="display:flex;flex-direction:column"><span class="gl" id="t-who"></span><span class="gs" id="t-who2"></span></div>
+        <div class="stepper big"><button type="button" id="g-minus" aria-label="−1">−</button><output id="g-out"></output><button type="button" id="g-plus" aria-label="+1">+</button></div>
+      </div>
+    </div>
+    <div id="banner" class="banner" hidden></div>
+    <div id="alert" hidden></div>
+    <div id="cards" class="cards"></div>
+
+    <section class="box" aria-labelledby="t-chat-h">
+      <div class="bar"><h2 id="t-chat-h"></h2><span class="small" id="t-chat-hint"></span></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="chips" id="quick"></div>
+      <form class="ask" id="askf"><input id="ask" autocomplete="off"><button class="btn small" type="submit" id="t-send"></button></form>
+    </section>
+  </div>
+</main>
+
+<script>
+(function(){
+"use strict";
+var T0 = Date.now();
+var lang = "ru";
+var I = {
+ tag:{ru:"планировщик поездок по Казахстану",en:"trip planner for Kazakhstan"},
+ proto:{ru:"Прототип · примерные цены",en:"Prototype · sample prices"},
+ formH:{ru:"Куда поехать с этими деньгами и этим составом?",en:"Where can we go with this money and these people?"},
+ formLead:{ru:"Введите бюджет на всю группу. Мы соберём три маршрута с полной ценой на человека.",en:"Enter the budget for the whole group. We will build three trips with the full price per person."},
+ budget:{ru:"Бюджет на группу, ₸",en:"Group budget, ₸"}, people:{ru:"Человек",en:"People"}, days:{ru:"Дней",en:"Days"},
+ from:{ru:"Откуда",en:"From"}, date:{ru:"Дата выезда",en:"Departure"}, int:{ru:"Что интересно",en:"Interests"},
+ go:{ru:"Собрать маршруты",en:"Build trips"},
+ note:{ru:"Партнёры и цены в прототипе условные. Оплата отключена.",en:"Partners and prices in this prototype are illustrative. Payment is switched off."},
+ res:{ru:"Три варианта под ваш бюджет",en:"Three trips for your budget"},
+ who:{ru:"Сколько едет?",en:"How many are going?"},
+ chatH:{ru:"Ассистент",en:"Assistant"}, chatHint:{ru:"Напишите, что поменять",en:"Tell it what to change"},
+ send:{ru:"Отправить",en:"Send"}, askPh:{ru:"Например: дешевле, без походов, с детьми",en:"e.g. cheaper, no hikes, with kids"},
+ nature:{ru:"Природа",en:"Nature"}, active:{ru:"Активный отдых",en:"Active"}, culture:{ru:"Культура",en:"Culture"}, family:{ru:"Для семьи",en:"Family"},
+ noHike:{ru:"Без походов",en:"No hikes"}, kids:{ru:"С детьми",en:"With kids"}, economy:{ru:"Эконом",en:"Budget mode"},
+ perP:{ru:"на человека",en:"per person"}, total:{ru:"Всего на группу",en:"Group total"},
+ inBudget:{ru:"В бюджете",en:"Within budget"}, over:{ru:"Выше бюджета на",en:"Over budget by"},
+ verified:{ru:"Проверенные партнёры",en:"Verified partners"}, parity:{ru:"Цена = цене партнёра",en:"Price = partner's own"},
+ plan:{ru:"План по дням",en:"Day by day"}, breakdown:{ru:"Из чего цена",en:"Price breakdown"},
+ comp:{ru:"Что",en:"Item"}, partner:{ru:"Партнёр",en:"Partner"}, sum:{ru:"Сумма",en:"Amount"},
+ refund:{ru:"Возврат",en:"Refunds"}, incl:{ru:"Не входит в цену",en:"Not included"},
+ notIncl:{ru:"Питание, личные расходы, сувениры",en:"Meals, personal spending, souvenirs"},
+ choose:{ru:"Выбрать",en:"Choose"}, chosen:{ru:"Выбрано",en:"Chosen"},
+ was:{ru:"было",en:"was"}, day:{ru:"День",en:"Day"},
+ dep:{ru:"Выезд из",en:"Departure from"}, ret:{ru:"Возвращение в",en:"Return to"},
+ free:{ru:"Свободное время у воды и прогулки",en:"Free time by the water and walks"},
+ nights:{ru:"ноч.",en:"nights"}, oneDay:{ru:"без ночёвки",en:"day trip"},
+ sumH:{ru:"Ваш выбор",en:"Your choice"},
+ shareH:{ru:"Сообщение для группового чата",en:"Message for the group chat"},
+ copy:{ru:"Скопировать",en:"Copy"}, copied:{ru:"Скопировано",en:"Copied"}, sel:{ru:"Выделено — нажмите Ctrl+C",en:"Selected — press Ctrl+C"},
+ payOff:{ru:"Онлайн-оплата пока отключена: сначала партнёр подтверждает заявку.",en:"Online payment is not available yet: the partner confirms the request first."},
+ testH:{ru:"Для тестировщика",en:"For testers"},
+ q1:{ru:"Понятна ли полная цена поездки? (1–5)",en:"Is the full trip price clear? (1–5)"},
+ q2:{ru:"Воспользовались бы этим для следующей поездки? (1–5)",en:"Would you use this for your next trip? (1–5)"},
+ cmt:{ru:"Комментарий (необязательно)",en:"Comment (optional)"},
+ codeH:{ru:"Скопируйте строку и отправьте команде проекта:",en:"Copy this line and send it to the project team:"},
+ time:{ru:"Время до выбора",en:"Time to choose"}, sec:{ru:"сек",en:"s"},
+ changeBanner:{ru:"Состав: {a} → {b}. Общие расходы (машина, жильё, гид) теперь делятся на {b}, поэтому цена на человека изменилась.",en:"Group: {a} → {b}. Shared costs (vehicle, rooms, guide) are now split by {b}, so the price per person changed."},
+ hello:{ru:"Я подобрал три поездки под ваш бюджет. Могу сделать дешевле, убрать походы, учесть детей, добавить день или сменить бюджет и состав.",en:"I picked three trips for your budget. I can make it cheaper, remove hikes, plan for kids, add a day, or change the budget and group size."},
+ unknown:{ru:"Не понял запрос. Попробуйте так: «дешевле», «без походов», «с детьми», «на 3 дня», «культура», «природа», «бюджет 250к», «нас 5». Или нажмите кнопку ниже.",en:"I did not understand. Try: \"cheaper\", \"no hikes\", \"with kids\", \"for 3 days\", \"culture\", \"nature\", \"budget 250k\", \"5 of us\". Or tap a button below."},
+ none:{ru:"Под эти условия маршрутов нет. Попробуйте другой город или больше дней.",en:"No trips match these settings. Try another city or more days."},
+ who2:{ru:"Цена на человека пересчитается сама",en:"The price per person updates itself"},
+ eBudget:{ru:"Введите бюджет от 20 000 до 5 000 000 ₸",en:"Enter a budget from 20,000 to 5,000,000 ₸"},
+ ePeople:{ru:"Укажите от 1 до 12 человек",en:"Enter 1 to 12 people"},
+ eDate:{ru:"Дата выезда не может быть в прошлом",en:"The departure date cannot be in the past"},
+ noFitH:{ru:"Ни одна поездка не укладывается в {b} на {n} чел.",en:"No trip fits {b} for {n} people."},
+ noFitT:{ru:"Самый доступный вариант — {x}: {t} на группу ({p} на человека).",en:"The lowest-priced option is {x}: {t} for the group ({p} per person)."},
+ raise:{ru:"Поднять бюджет до {t}",en:"Raise the budget to {t}"},
+ fewer:{ru:"На день меньше",en:"One day less"},
+ cheaperBtn:{ru:"Показать самые дешёвые",en:"Show the cheapest"},
+ minD:{ru:"Минимум {d} дн. — показано на {d}",en:"Minimum {d} days — shown for {d}"},
+ maxD:{ru:"Максимум {d} дн. — показано на {d}",en:"Maximum {d} days — shown for {d}"},
+ chooseBig:{ru:"Выбрать этот вариант",en:"Choose this trip"},
+ bookH:{ru:"Заявка на бронирование",en:"Booking request"},
+ bookLead:{ru:"Отправим заявку партнёрам. Они подтвердят места в течение 2 часов, оплата — только после подтверждения.",en:"We send the request to the partners. They confirm availability within 2 hours; you pay only after confirmation."},
+ bName:{ru:"Имя организатора",en:"Organiser's name"}, bPhone:{ru:"Телефон (WhatsApp)",en:"Phone (WhatsApp)"},
+ bAgree:{ru:"Я прочитал(а) условия возврата: ",en:"I have read the refund rules: "},
+ bSend:{ru:"Отправить заявку",en:"Send request"},
+ eName:{ru:"Введите имя (минимум 2 буквы)",en:"Enter a name (at least 2 letters)"},
+ ePhone:{ru:"Номер в формате +7 7XX XXX XX XX",en:"Use the format +7 7XX XXX XX XX"},
+ eAgree:{ru:"Отметьте, что прочитали условия возврата",en:"Please confirm you have read the refund rules"},
+ bOk:{ru:"Заявка {id} отправлена.",en:"Request {id} sent."},
+ bOk2:{ru:"Партнёры: {p}. Статус: ждёт подтверждения (до 2 ч). Деньги не списываются до подтверждения.",en:"Partners: {p}. Status: awaiting confirmation (up to 2 h). No money is taken before confirmation."},
+ bProto:{ru:"В прототипе заявка сохраняется только в этом браузере и партнёрам не уходит.",en:"In the prototype the request is saved only in this browser and is not sent to partners."},
+ newH:{ru:"Что изменилось после теста с пользователями (v2)",en:"What changed after user testing (v2)"},
+ newL:{ru:["Заявка на бронирование прямо в сервисе (просьба B5)","Крупнее переключатель «Сколько едет?» и кнопка «Выбрать этот вариант» (наблюдения бета-теста)","Ассистент понимает больше формулировок: «250к», «нас 5», «на 3 дня», казахские слова","Подсказка, если поездка длиннее или короче выбранного числа дней","Проверка ввода и помощь, если бюджета не хватает ни на один вариант"],
+       en:["Booking request inside the service (asked for by B5)","Larger \"How many are going?\" control and \"Choose this trip\" button (beta observations)","The assistant understands more phrasings: \"250k\", \"5 of us\", \"for 3 days\", Kazakh words","A note when a trip is longer or shorter than the chosen number of days","Input checks and help when the budget fits no trip"]}
+};
+function t(k){return (I[k]&&I[k][lang])||k}
+function tf(k,o){var s=t(k);Object.keys(o).forEach(function(x){s=s.split("{"+x+"}").join(o[x])});return s}
+function L(o){return typeof o==="string"?o:(o[lang]||o.en)}
+function fmt(n){return Math.round(n).toLocaleString(lang==="ru"?"ru-RU":"en-US").replace(/,/g," ")+" ₸"}
+function r100(n){return Math.round(n/100)*100}
+
+/* ---------- Sample supply: illustrative partners and prices (2026) ---------- */
+var VAN={ru:"Минивэн с водителем",en:"Minivan with driver"}, CAR={ru:"Аренда авто",en:"Rental car"};
+var D=[
+ {id:"kolsai",from:["almaty"],name:{ru:"Чарынский каньон и Кольсайские озёра",en:"Charyn Canyon and Kolsai Lakes"},tags:["nature","active"],min:2,max:3,
+  tr:[{n:VAN,p:{ru:"Транспорт «Жетысу Тур»",en:"Zhetysu Tour transport"},s:1,cap:6,base:110000,extra:40000},{n:CAR,p:{ru:"Прокат «Алатау»",en:"Alatau Rent"},s:1,cap:4,base:50000,extra:22000}],
+  st:[{n:{ru:"Гостевой дом в Саты",en:"Guesthouse in Saty"},cap:3,night:18000},{n:{ru:"Эко-отель у Кольсая",en:"Eco-hotel at Kolsai"},cap:2,night:32000}],
+  ex:[{n:{ru:"Чарын, Долина замков",en:"Charyn, Valley of Castles"},pp:3000,k:["easy","kids"]},{n:{ru:"Озеро Кольсай-1, лодка",en:"Kolsai Lake 1, boat"},pp:5000,k:["easy","kids"]},{n:{ru:"Поход к Кольсаю-2 с гидом (6 ч)",en:"Hike to Kolsai Lake 2 with guide (6 h)"},grp:25000,gc:8,k:["hike"]}],
+  rf:{ru:"Полный возврат до 72 ч до выезда, 50% — позже",en:"Full refund up to 72 h before departure, 50% after"}},
+ {id:"bal",from:["almaty"],name:{ru:"Большое Алматинское озеро и Медеу",en:"Big Almaty Lake and Medeu"},tags:["nature","family"],min:1,max:2,
+  tr:[{n:VAN,p:{ru:"Транспорт «Жетысу Тур»",en:"Zhetysu Tour transport"},s:1,cap:6,base:35000,extra:30000},{n:CAR,p:{ru:"Прокат «Алатау»",en:"Alatau Rent"},s:1,cap:4,base:18000,extra:18000}],
+  st:[{n:{ru:"Гостевой дом у Медеу",en:"Guesthouse near Medeu"},cap:3,night:22000},{n:{ru:"Горный отель на Шымбулаке",en:"Mountain hotel at Shymbulak"},cap:2,night:45000}],
+  ex:[{n:{ru:"Смотровая БАО с гидом",en:"Big Almaty Lake viewpoint with guide"},grp:15000,gc:6,k:["easy"]},{n:{ru:"Канатная дорога Шымбулак",en:"Shymbulak cable car"},pp:7000,k:["easy","kids"]}],
+  rf:{ru:"Бесплатная отмена до 24 ч",en:"Free cancellation up to 24 h"}},
+ {id:"altyn",from:["almaty"],name:{ru:"Нацпарк Алтын-Эмель",en:"Altyn-Emel National Park"},tags:["nature","active"],min:2,max:3,
+  tr:[{n:VAN,p:{ru:"Транспорт «Жетысу Тур»",en:"Zhetysu Tour transport"},s:1,cap:6,base:140000,extra:40000},{n:CAR,p:{ru:"Прокат «Алатау»",en:"Alatau Rent"},s:1,cap:4,base:60000,extra:25000}],
+  st:[{n:{ru:"Гостевой дом в Басши",en:"Guesthouse in Basshi"},cap:3,night:16000},{n:{ru:"Домики на кордоне",en:"Ranger-post cabins"},cap:2,night:24000}],
+  ex:[{n:{ru:"Вход в парк",en:"Park entry"},pp:4000,k:["easy","kids"]},{n:{ru:"Поющий бархан с рейнджером",en:"Singing Dune climb with ranger"},grp:30000,gc:6,k:["hike"]},{n:{ru:"Горы Актау, выезд",en:"Aktau Mountains drive"},grp:20000,gc:6,k:["easy"]}],
+  rf:{ru:"Полный возврат до 5 дней; пропуск в парк не возвращается",en:"Full refund up to 5 days before; park permit non-refundable"}},
+ {id:"turka",from:["almaty"],name:{ru:"Туркестан и Сауран (поезд)",en:"Turkistan and Sauran (train)"},tags:["culture","family"],min:2,max:3,
+  tr:[{n:{ru:"Поезд, купе (туда-обратно)",en:"Train, sleeper (return)"},p:{ru:"КТЖ",en:"KTZ"},s:0,pp:16000}],
+  st:[{n:{ru:"Семейный гостевой дом",en:"Family guesthouse"},cap:4,night:15000},{n:{ru:"Отель у мавзолея",en:"Hotel near the Mausoleum"},cap:2,night:28000}],
+  ex:[{n:{ru:"Мавзолей Ходжи Ахмеда Яссауи",en:"Mausoleum of Khoja Ahmed Yasawi"},pp:3000,k:["easy","kids","culture"]},{n:{ru:"Городище Сауран с гидом",en:"Sauran ancient city with guide"},grp:18000,gc:8,k:["easy","culture"]},{n:{ru:"Вечернее шоу Караван-Сарай",en:"Karavan-Saray evening show"},pp:6000,k:["kids","culture"]}],
+  rf:{ru:"Билеты по правилам КТЖ; отель — бесплатно до 48 ч",en:"Tickets per KTZ rules; hotel free up to 48 h"}},
+ {id:"alakol",from:["almaty"],name:{ru:"Алаколь, Акши",en:"Lake Alakol, Akshi"},tags:["family","nature"],min:3,max:5,
+  tr:[{n:{ru:"Поезд (туда-обратно)",en:"Train (return)"},p:{ru:"КТЖ",en:"KTZ"},s:0,pp:14000},{n:VAN,p:{ru:"Транспорт «Жетысу Тур»",en:"Zhetysu Tour transport"},s:1,cap:6,base:220000,extra:30000}],
+  st:[{n:{ru:"Гостевой дом у пляжа",en:"Beach guesthouse"},cap:4,night:20000},{n:{ru:"База отдыха на берегу",en:"Lakeside resort"},cap:3,night:38000}],
+  ex:[{n:{ru:"Грязевые и минеральные ванны",en:"Mud and mineral baths"},pp:4000,k:["easy","kids"]},{n:{ru:"Прогулка на лодке",en:"Boat trip"},pp:5000,k:["easy","kids"]}],
+  rf:{ru:"Полный возврат до 7 дней, позже — 30%",en:"Full refund up to 7 days before, 30% after"}},
+ {id:"burabay",from:["astana"],name:{ru:"Бурабай (Боровое)",en:"Burabay (Borovoe)"},tags:["nature","family"],min:1,max:3,
+  tr:[{n:VAN,p:{ru:"Транспорт «Сарыарка Трип»",en:"Saryarka Trip transport"},s:1,cap:6,base:60000,extra:15000},{n:CAR,p:{ru:"Прокат «Есиль»",en:"Yesil Rent"},s:1,cap:4,base:25000,extra:15000},{n:{ru:"Поезд (туда-обратно)",en:"Train (return)"},p:{ru:"КТЖ",en:"KTZ"},s:0,pp:6000}],
+  st:[{n:{ru:"Гостевой дом у озера Щучье",en:"Guesthouse at Lake Shchuchye"},cap:3,night:20000},{n:{ru:"Курортный отель у озера",en:"Lakeside resort hotel"},cap:2,night:55000}],
+  ex:[{n:{ru:"Лодка к Окжетпесу и Жумбактасу",en:"Boat to Okzhetpes and Zhumbaktas"},pp:3000,k:["easy","kids"]},{n:{ru:"Прогулка к Голубому заливу",en:"Walk to Blue Bay"},pp:0,k:["easy","kids"]},{n:{ru:"Восхождение на Болектау с гидом",en:"Bolektau climb with guide"},grp:20000,gc:8,k:["hike"]},{n:{ru:"Конная прогулка",en:"Horse riding"},pp:7000,k:["kids"]}],
+  rf:{ru:"Бесплатная отмена до 48 ч до заезда",en:"Free cancellation up to 48 h before check-in"}},
+ {id:"bayanaul",from:["astana"],name:{ru:"Нацпарк Баянаул",en:"Bayanaul National Park"},tags:["nature","active"],min:2,max:3,
+  tr:[{n:VAN,p:{ru:"Транспорт «Сарыарка Трип»",en:"Saryarka Trip transport"},s:1,cap:6,base:150000,extra:30000},{n:CAR,p:{ru:"Прокат «Есиль»",en:"Yesil Rent"},s:1,cap:4,base:55000,extra:20000}],
+  st:[{n:{ru:"Гостевой дом Торайгыр",en:"Toraigyr guesthouse"},cap:3,night:15000},{n:{ru:"Коттеджи на Жасыбае",en:"Zhasybay lake cottages"},cap:4,night:22000}],
+  ex:[{n:{ru:"Берег озера Жасыбай",en:"Zhasybay lake shore"},pp:0,k:["easy","kids"]},{n:{ru:"Пещера Коныраулие с гидом",en:"Konyrauli cave hike with guide"},grp:25000,gc:8,k:["hike"]},{n:{ru:"Вершина Акбет",en:"Akbet peak climb"},grp:30000,gc:8,k:["hike"]}],
+  rf:{ru:"Полный возврат до 72 ч",en:"Full refund up to 72 h"}},
+ {id:"karkaraly",from:["astana"],name:{ru:"Каркаралинские горы",en:"Karkaraly Mountains"},tags:["nature","active"],min:2,max:3,
+  tr:[{n:VAN,p:{ru:"Транспорт «Сарыарка Трип»",en:"Saryarka Trip transport"},s:1,cap:6,base:120000,extra:25000},{n:CAR,p:{ru:"Прокат «Есиль»",en:"Yesil Rent"},s:1,cap:4,base:45000,extra:18000}],
+  st:[{n:{ru:"Гостевой дом у Шайтанколя",en:"Shaitankol guesthouse"},cap:3,night:14000},{n:{ru:"Лесные домики",en:"Forest cabins"},cap:4,night:18000}],
+  ex:[{n:{ru:"Краеведческий музей",en:"Local history museum"},pp:1500,k:["easy","kids","culture"]},{n:{ru:"Смотровая на горе Кент",en:"Kent mountain viewpoint"},grp:15000,gc:6,k:["easy"]},{n:{ru:"Поход к Шайтанколю",en:"Hike to Lake Shaitankol"},grp:20000,gc:8,k:["hike"]}],
+  rf:{ru:"Бесплатная отмена до 72 ч",en:"Free cancellation up to 72 h"}},
+ {id:"turkb",from:["astana"],name:{ru:"Туркестан (самолёт)",en:"Turkistan (by air)"},tags:["culture"],min:2,max:3,
+  tr:[{n:{ru:"Перелёт туда-обратно",en:"Return flight"},p:{ru:"Авиакомпания-партнёр",en:"Partner airline"},s:0,pp:45000},{n:{ru:"Поезд (туда-обратно)",en:"Train (return)"},p:{ru:"КТЖ",en:"KTZ"},s:0,pp:22000}],
+  st:[{n:{ru:"Семейный гостевой дом",en:"Family guesthouse"},cap:4,night:15000},{n:{ru:"Отель у мавзолея",en:"Hotel near the Mausoleum"},cap:2,night:28000}],
+  ex:[{n:{ru:"Мавзолей Ходжи Ахмеда Яссауи",en:"Mausoleum of Khoja Ahmed Yasawi"},pp:3000,k:["easy","kids","culture"]},{n:{ru:"Городище Сауран с гидом",en:"Sauran ancient city with guide"},grp:18000,gc:8,k:["easy","culture"]}],
+  rf:{ru:"Перелёт по правилам авиакомпании; отель — бесплатно до 48 ч",en:"Flight per airline rules; hotel free up to 48 h"}},
+ {id:"mangystau",from:["almaty","astana"],name:{ru:"Мангистау: Бозжыра и Торыш",en:"Mangystau: Bozzhyra and Torysh"},tags:["nature","active","culture"],min:3,max:4,
+  tr:[{n:{ru:"Перелёт до Актау",en:"Return flight to Aktau"},p:{ru:"Авиакомпания-партнёр",en:"Partner airline"},s:0,pp:50000}],
+  st:[{n:{ru:"Отель в Актау",en:"Hotel in Aktau"},cap:2,night:25000},{n:{ru:"Юрточный лагерь",en:"Yurt camp"},cap:4,night:30000}],
+  ex:[{n:{ru:"Джип-тур в Бозжыру",en:"Jeep tour to Bozzhyra"},grp:70000,gc:4,k:["easy"]},{n:{ru:"Долина шаров Торыш",en:"Torysh valley of stone balls"},grp:50000,gc:4,k:["easy","kids"]},{n:{ru:"Подземная мечеть Бекет-Ата",en:"Beket-Ata underground mosque"},grp:60000,gc:4,k:["culture"]}],
+  rf:{ru:"Перелёт по правилам авиакомпании; туры бесплатно до 72 ч",en:"Flight per airline rules; tours free up to 72 h"}}
+];
+
+/* ---------- State ---------- */
+var S={budget:300000,people:4,days:2,from:"almaty",date:"",ints:["nature"],noHike:false,kids:false,economy:false};
+var prevPP={}, lastPlans=[], chosen=null, refs=0, grpChanges=0, chatLog=[], booked=null;
+
+function nextSaturday(){var d=new Date();var add=(6-d.getDay()+7)%7||7;d.setDate(d.getDate()+add);return d.toISOString().slice(0,10)}
+S.date=nextSaturday();
+
+/* ---------- Planner ---------- */
+function exAllowed(e){
+  if(S.noHike||S.kids){ if(e.k.indexOf("hike")>=0) return false; }
+  if(S.economy){ var c=e.pp!=null?e.pp:e.grp; if(e.grp!=null) return c<=20000; return c<=5000; }
+  return true;
+}
+function exCost(e,n){ return e.pp!=null ? e.pp*n : e.grp*Math.ceil(n/(e.gc||8)); }
+function trCost(r,n,d,min){ return r.s ? (r.base+r.extra*Math.max(0,d-min))*Math.ceil(n/r.cap) : r.pp*n; }
+function build(dst,n){
+  var d=Math.min(dst.max,Math.max(dst.min,S.days)), nights=Math.max(0,d-1);
+  var exs=dst.ex.filter(exAllowed);
+  var exTotal=exs.reduce(function(a,e){return a+exCost(e,n)},0);
+  var combos=[];
+  dst.tr.forEach(function(r){
+    var stays = nights===0 ? [null] : dst.st;
+    stays.forEach(function(s){
+      var tc=trCost(r,n,d,dst.min), rooms=s?Math.ceil(n/s.cap):0, sc=s?rooms*s.night*nights:0;
+      combos.push({r:r,s:s,rooms:rooms,tc:tc,sc:sc,total:tc+sc+exTotal});
+    });
+  });
+  combos.sort(function(a,b){return a.total-b.total});
+  var fit=combos.filter(function(c){return c.total<=S.budget});
+  var pick = S.economy ? combos[0] : (fit.length? fit[fit.length-1] : combos[0]);
+  var score=0;
+  S.ints.forEach(function(i){ if(dst.tags.indexOf(i)>=0) score+=30; });
+  if(S.kids && dst.tags.indexOf("family")>=0) score+=20;
+  if(S.kids && dst.tags.indexOf("active")>=0 && dst.tags.indexOf("family")<0) score-=15;
+  if(pick.total<=S.budget) score+=60;
+  score-=Math.abs(d-S.days)*12;
+  return {dst:dst,d:d,nights:nights,exs:exs,exTotal:exTotal,c:pick,total:pick.total,pp:r100(pick.total/n),fits:pick.total<=S.budget,score:score};
+}
+function plan(){
+  var list=D.filter(function(x){return x.from.indexOf(S.from)>=0}).map(function(x){return build(x,S.people)});
+  list.sort(function(a,b){ return (b.fits-a.fits) || (b.score-a.score) || (a.total-b.total); });
+  return list.slice(0,3);
+}
+
+/* ---------- Render ---------- */
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]})}
+function dateRange(d){
+  try{var a=new Date(S.date+"T00:00:00"),b=new Date(a);b.setDate(b.getDate()+d-1);
+  var o={day:"numeric",month:"short"},loc=lang==="ru"?"ru-RU":"en-GB";
+  return d===1?a.toLocaleDateString(loc,o):a.toLocaleDateString(loc,o)+" – "+b.toLocaleDateString(loc,o);}catch(e){return ""}
+}
+function dayPlan(p){
+  var city=lang==="ru"?(S.from==="almaty"?"Алматы":"Астаны"):(S.from==="almaty"?"Almaty":"Astana");
+  var city2=lang==="ru"?(S.from==="almaty"?"Алматы":"Астану"):city;
+  var days=[], ex=p.exs.slice();
+  for(var i=0;i<p.d;i++){
+    var items=[];
+    if(i===0) items.push(t("dep")+" "+city+" · "+L(p.c.r.n));
+    var per=Math.ceil(ex.length/Math.max(1,p.d-(i)));
+    var take=ex.splice(0,Math.max(1,Math.min(per,2)));
+    take.forEach(function(e){items.push(L(e.n))});
+    if(!take.length && i>0 && i<p.d-1) items.push(t("free"));
+    if(i===p.d-1) items.push(t("ret")+" "+city2);
+    days.push("<li><b>"+t("day")+" "+(i+1)+":</b> "+esc(items.join(" · "))+"</li>");
+  }
+  return "<ul class=\"list\">"+days.join("")+"</ul>";
+}
+function breakdown(p){
+  var n=S.people, rows=[];
+  rows.push([L(p.c.r.n)+(p.c.r.s?" × "+Math.ceil(n/p.c.r.cap):""),L(p.c.r.p),p.c.tc]);
+  if(p.c.s) rows.push([L(p.c.s.n)+" · "+p.c.rooms+" × "+p.nights+" "+t("nights"),L(p.c.s.n),p.c.sc]);
+  p.exs.forEach(function(e){rows.push([L(e.n),lang==="ru"?"Местный гид":"Local guide",exCost(e,n)])});
+  var h="<div class=\"tbl\"><table><thead><tr><th>"+t("comp")+"</th><th class=\"n\">"+t("sum")+"</th></tr></thead><tbody>";
+  rows.forEach(function(r){h+="<tr><td>"+esc(r[0])+"<div class=\"small\">"+esc(r[1])+" · "+t("parity")+"</div></td><td class=\"n\">"+fmt(r[2])+"</td></tr>"});
+  h+="<tr><td><b>"+t("total")+"</b></td><td class=\"n\"><b>"+fmt(p.total)+"</b></td></tr></tbody></table></div>";
+  return h;
+}
+function renderCards(){
+  var plans=plan(); lastPlans=plans;
+  var box=$("cards"); box.innerHTML="";
+  renderAlert(plans);
+  if(!plans.length){box.innerHTML="<div class=\"empty\">"+t("none")+"</div>";return}
+  plans.forEach(function(p,ix){
+    var dayNote = p.d>S.days ? "<span class=\"b info\">"+tf("minD",{d:p.d})+"</span>" : (p.d<S.days ? "<span class=\"b info\">"+tf("maxD",{d:p.d})+"</span>" : "");
+    var was=prevPP[p.dst.id], diff=(was&&was!==p.pp)?p.pp-was:0;
+    var el=document.createElement("article"); el.className="card"+(chosen&&chosen.dst.id===p.dst.id?" sel":"");
+    el.innerHTML=
+      "<span class=\"tag\">"+(lang==="ru"?"Вариант ":"Option ")+(ix+1)+" · "+esc(p.dst.tags.map(t).join(", "))+"</span>"+
+      "<h3>"+esc(L(p.dst.name))+"</h3>"+
+      "<div class=\"meta\">"+dateRange(p.d)+" · "+p.d+" "+(lang==="ru"?"дн.":"days")+" · "+(p.nights?p.nights+" "+t("nights"):t("oneDay"))+"</div>"+
+      "<div class=\"price\"><span class=\"pp\">"+fmt(p.pp)+"</span><span class=\"ppl\">"+t("perP")+"</span>"+(diff?"<span class=\"was\">"+t("was")+" "+fmt(was)+"</span>":"")+"</div>"+
+      "<div class=\"tot\">"+t("total")+": "+fmt(p.total)+" · "+S.people+" "+(lang==="ru"?"чел.":"people")+"</div>"+
+      "<div class=\"badges\">"+(p.fits?"<span class=\"b ok\">"+t("inBudget")+"</span>":"<span class=\"b over\">"+t("over")+" "+fmt(p.total-S.budget)+"</span>")+"<span class=\"b\">"+t("verified")+"</span>"+dayNote+"</div>"+
+      "<details><summary>"+t("plan")+"</summary>"+dayPlan(p)+"</details>"+
+      "<details><summary>"+t("breakdown")+"</summary>"+breakdown(p)+"<p class=\"small\" style=\"margin:8px 0 0\"><b>"+t("refund")+":</b> "+esc(L(p.dst.rf))+"<br><b>"+t("incl")+":</b> "+t("notIncl")+"</p></details>"+
+      "<div class=\"actions\"><button type=\"button\" class=\"btn block\" data-pick=\""+ix+"\">"+(chosen&&chosen.dst.id===p.dst.id?"✓ "+t("chosen"):t("chooseBig"))+"</button></div>";
+    box.appendChild(el);
+  });
+  box.querySelectorAll("[data-pick]").forEach(function(b){b.addEventListener("click",function(){choose(+b.getAttribute("data-pick"))})});
+}
+/* Non-standard case: the budget fits none of the trips */
+function renderAlert(plans){
+  var a=$("alert");
+  if(!plans.length || plans.some(function(p){return p.fits})){a.hidden=true;a.innerHTML="";return}
+  var c=plans.reduce(function(m,p){return !m||p.total<m.total?p:m},null);
+  var need=Math.ceil(c.total/10000)*10000;
+  a.hidden=false; a.className="alert";
+  a.innerHTML="<b>"+esc(tf("noFitH",{b:fmt(S.budget),n:S.people}))+"</b><span>"+esc(tf("noFitT",{x:L(c.dst.name),t:fmt(c.total),p:fmt(c.pp)}))+"</span>"+
+   "<div class=\"acts\"><button type=\"button\" class=\"btn small\" id=\"fx-raise\">"+esc(tf("raise",{t:fmt(need)}))+"</button>"+
+   (S.days>1?"<button type=\"button\" class=\"btn small ghost\" id=\"fx-day\">"+t("fewer")+"</button>":"")+
+   (!S.economy?"<button type=\"button\" class=\"btn small ghost\" id=\"fx-eco\">"+t("cheaperBtn")+"</button>":"")+"</div>";
+  $("fx-raise").addEventListener("click",function(){S.budget=need;syncForm();renderAll()});
+  if($("fx-day")) $("fx-day").addEventListener("click",function(){S.days=Math.max(1,S.days-1);syncForm();renderAll()});
+  if($("fx-eco")) $("fx-eco").addEventListener("click",function(){S.economy=true;syncChips();renderAll()});
+}
+function snapshotPP(){prevPP={};lastPlans.forEach(function(p){prevPP[p.dst.id]=p.pp})}
+function renderAll(){ $("g-out").textContent=S.people+" "+(lang==="ru"?"чел.":"people"); renderCards(); if(chosen) renderSummary(); }
+
+/* ---------- Choose + summary + tester block ---------- */
+var R={clear:0,use:0};
+function choose(ix){
+  var p=lastPlans[ix]; if(!p) return;
+  chosen=p; chosen.at=Date.now(); R={clear:0,use:0};
+  renderCards(); renderSummary();
+  $("summary").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function shareText(p){
+  var refund=L(p.dst.rf), dr=dateRange(p.d).replace(/\.$/,"");
+  return lang==="ru"
+   ? "Едем: "+L(p.dst.name)+", "+dr+".\nС каждого: "+fmt(p.pp)+" (транспорт, жильё, экскурсии). Всего на "+S.people+" чел.: "+fmt(p.total)+".\nВозврат: "+refund+".\nСкиньте до среды, чтобы подтвердить бронь."
+   : "Trip: "+L(p.dst.name)+", "+dr+".\nEach person: "+fmt(p.pp)+" (transport, stay, excursions). Total for "+S.people+": "+fmt(p.total)+".\nRefunds: "+refund+".\nPlease send by Wednesday so we can confirm.";
+}
+function testCode(){
+  var p=chosen, secs=Math.round(((p.at||Date.now())-T0)/1000);
+  var c=($("cmt")&&$("cmt").value||"").replace(/[|\n]/g," ").slice(0,140);
+  var ts=new Date().toISOString().slice(0,16);
+  return "SAYAKHAT|"+ts+"|lang="+lang+"|t="+secs+"s|refine="+refs+"|group_changes="+grpChanges+"|pick="+p.dst.id+"|people="+S.people+"|pp="+p.pp+"|fits="+(p.fits?1:0)+"|clear="+R.clear+"|use="+R.use+"|book="+(booked?1:0)+"|v=2|c="+c;
+}
+function rateRow(key){
+  var h="<div class=\"rate\" data-key=\""+key+"\">";
+  for(var i=1;i<=5;i++) h+="<button type=\"button\" data-v=\""+i+"\" aria-pressed=\""+(R[key]===i)+"\">"+i+"</button>";
+  return h+"</div>";
+}
+function renderSummary(){
+  var p=chosen, el=$("summary");
+  var cur=lastPlans.filter(function(x){return x.dst.id===p.dst.id})[0];
+  if(cur){ cur.at=p.at; chosen=p=cur; }
+  var secs=Math.round(((p.at||Date.now())-T0)/1000);
+  el.hidden=false;
+  el.innerHTML=
+   "<div class=\"bar\"><h2>"+t("sumH")+": "+esc(L(p.dst.name))+"</h2><span class=\"small\">"+dateRange(p.d)+"</span></div>"+
+   "<div class=\"sum\">"+
+    "<div style=\"display:flex;flex-direction:column;gap:8px;min-width:0\">"+
+     "<div><span class=\"big\">"+fmt(p.pp)+"</span> <span class=\"small\">"+t("perP")+"</span></div>"+
+     "<div class=\"tot\">"+t("total")+": "+fmt(p.total)+" · "+S.people+" "+(lang==="ru"?"чел.":"people")+"</div>"+
+     "<label class=\"f\" for=\"share\">"+t("shareH")+"</label><textarea id=\"share\" readonly>"+esc(shareText(p))+"</textarea>"+
+     "<div style=\"display:flex;gap:8px;align-items:center;flex-wrap:wrap\"><button type=\"button\" class=\"btn small\" id=\"cp-share\">"+t("copy")+"</button><span class=\"small\" id=\"cp-share-s\"></span></div>"+
+     bookBlock(p)+
+    "</div>"+
+    "<div style=\"display:flex;flex-direction:column;gap:10px;background:var(--sunk);border-radius:10px;padding:12px;min-width:0\">"+
+     "<b>"+t("testH")+"</b><span class=\"small\">"+t("time")+": "+secs+" "+t("sec")+"</span>"+
+     "<span class=\"small\">"+t("q1")+"</span>"+rateRow("clear")+
+     "<span class=\"small\">"+t("q2")+"</span>"+rateRow("use")+
+     "<label class=\"f\" for=\"cmt\">"+t("cmt")+"<input id=\"cmt\"></label>"+
+     "<span class=\"small\">"+t("codeH")+"</span><code class=\"code\" id=\"code\">"+esc(testCode())+"</code>"+
+     "<div style=\"display:flex;gap:8px;align-items:center;flex-wrap:wrap\"><button type=\"button\" class=\"btn small ghost\" id=\"cp-code\">"+t("copy")+"</button><span class=\"small\" id=\"cp-code-s\"></span></div>"+
+    "</div>"+
+   "</div>";
+  el.querySelectorAll(".rate").forEach(function(row){
+    row.addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;R[row.getAttribute("data-key")]=+b.getAttribute("data-v");
+      row.querySelectorAll("button").forEach(function(x){x.setAttribute("aria-pressed",String(x===b))});$("code").textContent=testCode();});
+  });
+  $("cmt").addEventListener("input",function(){$("code").textContent=testCode()});
+  $("cp-share").addEventListener("click",function(){copy($("share").value,$("share"),"cp-share-s")});
+  $("cp-code").addEventListener("click",function(){copy(testCode(),$("code"),"cp-code-s")});
+  if($("bf")) $("bf").addEventListener("submit",function(e){e.preventDefault();sendBooking(p)});
+}
+/* Change after beta (B5): booking request inside the service */
+function partnersOf(p){var a=[L(p.c.r.p)];if(p.c.s)a.push(L(p.c.s.n));if(p.exs.length)a.push(lang==="ru"?"местный гид":"local guide");return a.join(", ")}
+function bookBlock(p){
+  if(booked&&booked.trip===p.dst.id){
+    return "<div class=\"book\"><b>"+t("bookH")+"</b><div class=\"okbox\" role=\"status\"><b>"+esc(tf("bOk",{id:booked.id}))+"</b><br>"+esc(tf("bOk2",{p:partnersOf(p)}))+"</div><p class=\"note\">"+t("bProto")+"</p></div>";
+  }
+  return "<form class=\"book\" id=\"bf\" novalidate><b>"+t("bookH")+"</b><span class=\"small\">"+t("bookLead")+"</span>"+
+   "<div class=\"row2\"><label class=\"f\">"+t("bName")+"<input id=\"b-name\" autocomplete=\"name\"><span class=\"err\" id=\"e-name\" role=\"alert\"></span></label>"+
+   "<label class=\"f\">"+t("bPhone")+"<input id=\"b-phone\" type=\"tel\" inputmode=\"tel\" placeholder=\"+7 7XX XXX XX XX\" autocomplete=\"tel\"><span class=\"err\" id=\"e-phone\" role=\"alert\"></span></label></div>"+
+   "<label class=\"chk\"><input type=\"checkbox\" id=\"b-agree\"><span>"+t("bAgree")+esc(L(p.dst.rf))+"</span></label><span class=\"err\" id=\"e-agree\" role=\"alert\"></span>"+
+   "<button class=\"btn\" type=\"submit\" id=\"b-send\">"+t("bSend")+" · "+fmt(p.total)+"</button>"+
+   "<p class=\"note\">"+t("payOff")+"</p></form>";
+}
+function setErr(inp,errId,msg){var e=$(errId);if(e)e.textContent=msg||"";if(inp){if(msg)inp.setAttribute("aria-invalid","true");else inp.removeAttribute("aria-invalid")}return !msg}
+function sendBooking(p){
+  var nm=$("b-name"), ph=$("b-phone"), ag=$("b-agree");
+  var digits=(ph.value||"").replace(/[\s()\-]/g,"");
+  if(/^8\d{10}$/.test(digits)) digits="+7"+digits.slice(1);
+  var ok1=setErr(nm,"e-name",(nm.value.trim().length<2)?t("eName"):"");
+  var ok2=setErr(ph,"e-phone",/^\+77\d{9}$/.test(digits)?"":t("ePhone"));
+  var ok3=setErr(ag,"e-agree",ag.checked?"":t("eAgree"));
+  if(!(ok1&&ok2&&ok3)){ (ok1?(ok2?ag:ph):nm).focus(); return; }
+  booked={id:"SA-"+String(Date.now()).slice(-6),trip:p.dst.id,people:S.people,total:p.total,at:new Date().toISOString()};
+  try{var k="sayakhat_requests",arr=JSON.parse(localStorage.getItem(k)||"[]");arr.push({id:booked.id,trip:booked.trip,people:booked.people,total:booked.total,at:booked.at});localStorage.setItem(k,JSON.stringify(arr))}catch(e){}
+  renderSummary();
+}
+function copy(text,node,statusId){
+  var done=function(){$(statusId).textContent=t("copied")};
+  var fallback=function(){try{if(node.select){node.select()}else{var r=document.createRange();r.selectNodeContents(node);var s=window.getSelection();s.removeAllRanges();s.addRange(r)}}catch(e){} $(statusId).textContent=t("sel")};
+  try{ navigator.clipboard.writeText(text).then(done,fallback);}catch(e){fallback()}
+}
+
+/* ---------- Assistant (rule-based in the prototype) ---------- */
+function say(who,text){chatLog.push([who,text]);var m=document.createElement("div");m.className="msg "+who;m.textContent=text;$("chat").appendChild(m);$("chat").scrollTop=$("chat").scrollHeight}
+function cheapest(){return lastPlans.reduce(function(a,p){return !a||p.pp<a.pp?p:a},null)}
+/* Change after beta: the assistant accepts more phrasings (synonyms, 250k / 250 тыс, "нас 5", "на 3 дня", Kazakh keywords) */
+function parseBudget(s){
+  var m=s.match(/(\d+(?:[.,]\d+)?)\s*(млн|mln|million|m(?![a-z]))/); if(m) return Math.round(parseFloat(m[1].replace(",","."))*1e6);
+  m=s.match(/(\d+(?:[.,]\d+)?)\s*(к(?![а-я])|k(?![a-z])|тыс|thousand|мың)/); if(m) return Math.round(parseFloat(m[1].replace(",","."))*1000);
+  m=s.replace(/(\d)[\s.,](?=\d{3}\b)/g,"$1").match(/(\d{5,})/); if(m) return +m[1];
+  return null;
+}
+function handle(q){
+  var s=q.toLowerCase().replace(/ё/g,"е").replace(/[!?;:«»"]/g," "), changed=[], ru=lang==="ru", warn=[];
+  var b=parseBudget(s);
+  var ppl=s.match(/(\d{1,2})\s*(чел|people|person|pax|ppl|адам|of us)/)||s.match(/(?:нас|we are|we're|for)\s*(\d{1,2})(?!\s*(?:дн|day|күн|\d))/);
+  var dd=s.match(/(?:на\s*)?(\d)\s*(дн|день|дня|day|күн)/);
+  if(/(дешев|подешев|эконом|бюджетн|сэконом|cheap|save money|budget mode|арзан)/.test(s)){S.economy=true;changed.push(ru?"выбрал самые экономные варианты":"switched to the lowest-cost options")}
+  if(/(без|no|not|не|without|жоқ).{0,14}(поход|хайк|hik|трек|trek|восхожд|подъем|climb)|(легк|easy|спокойн|relax|чилл)/.test(s)){S.noHike=true;changed.push(ru?"убрал походы":"removed hikes")}
+  if(/(дет|ребен|малыш|kid|child|бала)/.test(s)){S.kids=true;S.noHike=true;changed.push(ru?"учёл детей: только лёгкие активности":"planned for kids: easy activities only")}
+  if(dd){var nd=Math.min(5,Math.max(1,+dd[1]));if(nd!==S.days){S.days=nd;changed.push((ru?"дней: ":"days: ")+S.days)}}
+  else if(/(\+\s?1|еще (один )?день|add a day|extra day|longer|подольше|на день больше|продли)/.test(s)){S.days=Math.min(5,S.days+1);changed.push((ru?"дней: ":"days: ")+S.days)}
+  else if(/(короче|shorter|-\s?1|на день меньше|меньше дней|one day less)/.test(s)){S.days=Math.max(1,S.days-1);changed.push((ru?"дней: ":"days: ")+S.days)}
+  if(/(культур|culture|истор|history|музе|museum|мавзол|тарих)/.test(s)){if(S.ints.indexOf("culture")<0)S.ints.push("culture");changed.push(ru?"добавил культуру":"added culture")}
+  if(/(природ|nature|гор(?:а|ы|у|ах)?(?![а-я])|mountain|озер|lake|табиғат|көл)/.test(s)){if(S.ints.indexOf("nature")<0)S.ints.push("nature");changed.push(ru?"добавил природу":"added nature")}
+  if(/(сброс|заново|reset|start over)/.test(s)){S.economy=false;S.noHike=false;S.kids=false;S.ints=["nature"];changed.push(ru?"сбросил фильтры":"cleared filters")}
+  if(b!=null){ if(b>=20000&&b<=5000000){S.budget=b;changed.push((ru?"бюджет: ":"budget: ")+fmt(b))} else warn.push(t("eBudget")) }
+  if(ppl){var n=+ppl[1]; if(n>=1&&n<=12){ if(n!==S.people){snapshotPP();grpChanges++;S.people=n;changed.push((ru?"состав: ":"group: ")+n)} } else warn.push(t("ePeople")) }
+  if(!changed.length){say("a",warn.length?warn.join(". ")+".":t("unknown"));return}
+  refs++; syncForm(); renderAll(); syncChips();
+  var c=cheapest();
+  say("a",(ru?"Готово: ":"Done: ")+changed.join(", ")+". "+(c?(ru?"Самый доступный вариант теперь — ":"The lowest-priced option is now ")+L(c.dst.name)+", "+fmt(c.pp)+" "+t("perP")+".":t("none")));
+}
+
+/* ---------- Form, chips, i18n ---------- */
+var INTS=["nature","active","culture","family"], FLAGS=["noHike","kids","economy"];
+function syncChips(){
+  $("interests").innerHTML=INTS.map(function(k){return "<button type=\"button\" class=\"chip\" data-int=\""+k+"\" aria-pressed=\""+(S.ints.indexOf(k)>=0)+"\">"+t(k)+"</button>"}).join("");
+  $("flags").innerHTML=FLAGS.map(function(k){return "<button type=\"button\" class=\"chip\" data-flag=\""+k+"\" aria-pressed=\""+!!S[k]+"\">"+t(k)+"</button>"}).join("");
+  $("interests").querySelectorAll("[data-int]").forEach(function(b){b.addEventListener("click",function(){var k=b.getAttribute("data-int"),i=S.ints.indexOf(k);if(i>=0)S.ints.splice(i,1);else S.ints.push(k);b.setAttribute("aria-pressed",String(i<0));})});
+  $("flags").querySelectorAll("[data-flag]").forEach(function(b){b.addEventListener("click",function(){var k=b.getAttribute("data-flag");S[k]=!S[k];if(k==="kids"&&S.kids)S.noHike=true;syncChips();})});
+}
+function syncForm(){$("in-budget").value=S.budget;$("in-people").value=S.people;$("in-days").value=S.days;$("in-from").value=S.from;$("in-date").value=S.date}
+/* Non-standard case: invalid input is checked and explained instead of being silently changed */
+function todayISO(){var d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
+function readForm(){
+  var bi=$("in-budget"), pi=$("in-people"), di=$("in-date");
+  var b=bi.value===""?NaN:+bi.value, n=pi.value===""?NaN:+pi.value, dt=di.value;
+  var okB=setErr(bi,"e-budget",(isFinite(b)&&b>=20000&&b<=5000000)?"":t("eBudget"));
+  var okP=setErr(pi,"e-people",(isFinite(n)&&n>=1&&n<=12&&Math.floor(n)===n)?"":t("ePeople"));
+  var okD=setErr(di,"e-date",(!dt||dt>=todayISO())?"":t("eDate"));
+  if(!(okB&&okP&&okD)){ (okB?(okP?di:pi):bi).focus(); return false; }
+  S.budget=b; S.days=+$("in-days").value; S.from=$("in-from").value; S.date=dt||S.date; S.people=n;
+  return true;
+}
+function quick(){
+  var q=lang==="ru"?["Дешевле","Без походов","С детьми","+1 день","Культура"]:["Cheaper","No hikes","With kids","+1 day","Culture"];
+  $("quick").innerHTML=q.map(function(x){return "<button type=\"button\" class=\"chip\">"+x+"</button>"}).join("");
+  $("quick").querySelectorAll("button").forEach(function(b){b.addEventListener("click",function(){say("u",b.textContent);handle(b.textContent)})});
+}
+function applyLang(){
+  document.documentElement.lang=lang;
+  var map={"t-tag":"tag","t-proto":"proto","t-form-h":"formH","t-form-lead":"formLead","t-budget":"budget","t-people":"people","t-days":"days","t-from":"from","t-date":"date","t-int":"int","t-go":"go","t-note":"note","t-res":"res","t-who":"who","t-who2":"who2","t-chat-h":"chatH","t-chat-hint":"chatHint","t-send":"send","t-new-h":"newH"};
+  Object.keys(map).forEach(function(id){$(id).textContent=t(map[id])});
+  $("t-new").innerHTML=t("newL").map(function(x){return "<li>"+esc(x)+"</li>"}).join("");
+  ["e-budget","e-people","e-date"].forEach(function(id){$(id).textContent=""});
+  ["in-budget","in-people","in-date"].forEach(function(id){$(id).removeAttribute("aria-invalid")});
+  $("in-date").min=todayISO();
+  $("ask").placeholder=t("askPh");
+  var o=$("in-from").options;o[0].textContent=lang==="ru"?"Алматы":"Almaty";o[1].textContent=lang==="ru"?"Астана":"Astana";
+  $("lang-ru").setAttribute("aria-pressed",String(lang==="ru"));$("lang-en").setAttribute("aria-pressed",String(lang==="en"));
+  syncChips(); quick();
+  $("chat").innerHTML=""; var old=chatLog; chatLog=[]; if(!old.length) say("a",t("hello")); else { say("a",t("hello")); }
+  renderAll();
+}
+
+$("f").addEventListener("submit",function(e){e.preventDefault();var before=S.people;if(!readForm())return;if(S.people!==before){snapshotPP();grpChanges++}else{prevPP={}}refs+=0;renderAll();$("banner").hidden=true;});
+$("askf").addEventListener("submit",function(e){e.preventDefault();var q=$("ask").value.trim();if(!q)return;say("u",q);$("ask").value="";handle(q)});
+function changeGroup(d){
+  var a=S.people,b=Math.min(12,Math.max(1,a+d)); if(a===b) return;
+  snapshotPP(); S.people=b; grpChanges++; syncForm(); renderAll();
+  $("banner").hidden=false; $("banner").innerHTML="<b>"+(lang==="ru"?"Пересчёт":"Recalculated")+".</b> "+esc(t("changeBanner").replace(/\{a\}/g,a).replace(/\{b\}/g,b));
+}
+$("g-minus").addEventListener("click",function(){changeGroup(-1)});
+$("g-plus").addEventListener("click",function(){changeGroup(1)});
+$("lang-ru").addEventListener("click",function(){lang="ru";applyLang()});
+$("lang-en").addEventListener("click",function(){lang="en";applyLang()});
+
+syncForm(); applyLang();
+})();
+</script>
+</body>
+</html>
